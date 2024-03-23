@@ -35,41 +35,19 @@ const ESC_CLIENT = new ECSClient({
 const postGresSqlClient = new PrismaClient({})
 
 
-// const kafka = new Kafka({
-//     clientId: 'logs-container',
-//     brokers: ['kafka-1f0e7a39-adarshkdev.a.aivencloud.com:12437'],
-//     ssl: {
-//         //rejectUnauthorized: false,
-//         ca: [fs.readFileSync('kafka.pem', 'utf-8')],
-//         // key: fs.readFileSync('/my/custom/client-key.pem', 'utf-8'),
-//         // cert: fs.readFileSync('/my/custom/client-cert.pem', 'utf-8')
-//     },
-//     sasl: {
-//         username: "avnadmin",
-//         password: "AVNS_8dfrdD27j7mu23VaHw8",
-//         mechanism: "plain"
-//     }
 
-// })
-
-// const ClickHouseclient = createClient({
-//     host: "https://clickhouse-2d29c66d-adarshkdev.a.aivencloud.com:12425",
-//     username: "avnadmin",
-//     password: "AVNS_kVPIwu-8ln7Q3Jy94VO",
-//     database: "default",
-// })
 
 const ClickHouseclient = createClient({
-    host: "https://izawn0ce3u.ap-southeast-1.aws.clickhouse.cloud:8443",
+    host: process.env.CLICKHOSE_HOST,
     //username: "avnadmin",
-    password: "~ZS4eGYellM2h",
+    password: process.env.CLICKOUSE_PASSWORD,
     database: "default",
 })
 
 
 //const kafkaConsumer = kafka.consumer({ groupId: "api-service-topics" })
 
-const redisURI = "rediss://default:AVNS_aeEILLehWZ1Wk0Ttcju@redis-20394abb-adarshkdev.a.aivencloud.com:12425"
+const redisURI = process.env.REDIS_URI
  const REDIS_CLIENT = new Redis(redisURI)
 
 //////////////////////  SOCKET CONNECTION SETUP IN DIFFRENT PORT //////////////
