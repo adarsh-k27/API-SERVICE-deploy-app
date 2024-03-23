@@ -1,0 +1,17 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "deploy-app-server",
+            "Group": "GROUP_TEST",
+            "Host": "pg-ad6b089-adarshkdev.a.aivencloud.com",
+            "Port": 12424,
+            "MaintenanceDB": "defaultdb",
+            "Username": "avnadmin",
+            "TunnelPort": "22",
+            "KerberosAuthentication": false,
+            "ConnectionParameters": {
+                "sslmode": "require"
+            }
+        }
+    }
+}

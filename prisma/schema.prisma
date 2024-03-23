@@ -1,0 +1,58 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id String @id @default(uuid())
+  name String @map("name")
+  git_url String @map("git_url")
+  sub_domain String @map("sub_domain")
+  custom_domain String? @map("custom_domain")
+  Deployment Deployment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum  STATUS {
+  NOT_STARTED
+  QUEUED
+  IN_PROGRESS
+  DEPLOYED
+  FAILED
+}
+
+enum  USER_TYPE {
+  USER
+  ADMIN
+}
+
+model Deployment {
+  id String @id @default(uuid())
+  project Project   @relation(fields: [project_id], references: [id])
+  project_id String @map("project_id")
+  status STATUS 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id String @id @default(uuid())
+  avatar_url String @map("avatar_url")
+  repos_url String @map("repos_url")
+  type USER_TYPE 
+  name String @unique @map("name")
+  email String @map("email")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
