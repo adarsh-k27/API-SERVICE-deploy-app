@@ -8,8 +8,6 @@ const http = require('http')
 const dotenv = require('dotenv')
 const { z } = require('zod')
 const { PrismaClient } = require('@prisma/client')
-const { Kafka } = require("kafkajs")
-const fs = require("fs")
 const { createClient } = require("@clickhouse/client")
 const { v4: uuid_v4 } = require('uuid')
 //Environment Configuration
