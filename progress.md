@@ -4,7 +4,4 @@
 
 3. hit deploy route for deploy the project with docker container  and listening for logs => pending 
 
-4. kafka setup => pending 
-
-5. 
-
+4. add project based upon user and get cookoies from headers 

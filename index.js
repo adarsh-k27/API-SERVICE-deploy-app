@@ -6,17 +6,35 @@ const Redis = require('ioredis')
 const { Server } = require("socket.io");
 const http = require('http')
 const dotenv = require('dotenv')
-const { z } = require('zod')
+const { z, string } = require('zod')
 const { PrismaClient } = require('@prisma/client')
 const { createClient } = require("@clickhouse/client")
 const { v4: uuid_v4 } = require('uuid')
+const EventEmitter = require('events').EventEmitter
+const jwt = require('jsonwebtoken');
+
+const cors = require('cors')
+const { JWT_Verify } = require("./middlewares.ts")
+
+
+
+
+
 //Environment Configuration
 dotenv.config()
-const bodyParser=require("body-parser");
+const bodyParser = require("body-parser");
+
 
 //middlewares uses 
 
 app.use(bodyParser.json())
+
+app.use(cors({
+    origin: 'http://localhost:4000', // Allow requests from this origin
+    credentials:true,
+    allowedHeaders:true,
+    
+}))
 
 //Port setup here
 const PORT = process.env.PORT || 5000;
@@ -48,7 +66,7 @@ const ClickHouseclient = createClient({
 //const kafkaConsumer = kafka.consumer({ groupId: "api-service-topics" })
 
 const redisURI = process.env.REDIS_URI
- const REDIS_CLIENT = new Redis(redisURI)
+const REDIS_CLIENT = new Redis(redisURI)
 
 //////////////////////  SOCKET CONNECTION SETUP IN DIFFRENT PORT //////////////
 
@@ -91,12 +109,18 @@ app.get("/health", (req, res) => {
     return res.status(200).json({ message: "Health is stable" })
 })
 
+app.post("/health",JWT_Verify, async(req, res) => {
+    console.log(req.body);
+    return res.status(200).json({ message: "Health is stable" })
+})
+
 app.post("/project", async (req, res) => {
 
     const projectModalSchema = z.object({
         name: z.string(),
         git_url: z.string().url(),
-        sub_domain: z.string()
+        sub_domain: z.string(),
+        metadata: z.optional(z.string())
     })
 
     try {
@@ -105,12 +129,14 @@ app.post("/project", async (req, res) => {
 
         // if(safeParseDataResult.error) return res.status(400).json({message:"please Validate Correctly"})
 
-        const { name, git_url, sub_domain } = safeParseDataResult
+        const { name, git_url, sub_domain, metadata } = safeParseDataResult
 
-
+        if (!metadata) {
+            metadata = ""
+        }
         const result = await postGresSqlClient.project.create({
             data: {
-                name, git_url, sub_domain, custom_domain: `http://${name}-${sub_domain}.localhost:8000/`
+                name, git_url, sub_domain, custom_domain: `http://${name}-${sub_domain}.localhost:8000/`, metadata
             }
         })
 
@@ -278,11 +304,9 @@ app.post('/login', async (req, res) => {
                     type: "USER"
                 }
             })
-            return res.status(200).json({ user })
+            const token = jwt.sign(user, nextAuthSecret)
+            return res.status(200).json({ user: { ...user, access_token: token } })
         }
-
-
-
     } catch (error) {
         switch (error.name) {
             case ("ZodError"): {
@@ -319,9 +343,9 @@ app.post('/login', async (req, res) => {
 
 // }
 
-app.get("/user", async(req, res) => {
+app.get("/user", async (req, res) => {
     try {
-        
+
         const paramsSchema = z.object({
 
             email: z.string().email()
@@ -333,10 +357,29 @@ app.get("/user", async(req, res) => {
             where: { email: parsedResult.email }
         })
 
-        if(users.length){
-            return res.status(200).json({user:users[0]})
+        const payload = {
+            user:users[0]
+        };
+
+        const options = {
+            expiresIn: '1h' // Token expiration time (e.g., 1 hour)
+        };
+    
+        const token = jwt.sign(payload, "bednipxw5Nepcvw6uajz0FqWq9hDeHrAmc8ffkOMJt0=", options);  
+        
+        res.cookie('accessToken', token, {
+            maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in milliseconds
+            httpOnly: true, // Cookie is only accessible on the server side
+            //secure: process.env.NODE_ENV === 'production' // Set to true in production
+          });
+        
+        
+
+        if (users.length) {
+            return res.status(200).json({ user: users[0],access_token:token })
         }
 
+        
 
     } catch (error) {
         switch (error.name) {
@@ -426,31 +469,55 @@ async function CONSUMER_Message() {
 }
 
 
+// app.get('/polling-logs',async(req,res)=>{
+//     try {
+
+//     } catch (error) {
+
+//     }
+// })
 
 
-const REDIS_CONSUMER_MESSAGE=async()=>{
+// const poller= new EventEmitter()
+
+// setInterval(()=>{
+//     const logs=["Build tarted, Build,happened","kshdkjs","skdnhjsdnkjsdl","skldhjdk"]
+//     poller.emit("logs",logs)
+// },1000)
+
+
+// poller.on("logs",(logs)=>{
+//     console.log("LOGS FETCHED",logs);
+// })
+
+
+
+
+
+
+const REDIS_CONSUMER_MESSAGE = async () => {
     try {
-    
-      REDIS_CLIENT.psubscribe("log:*",(err,count)=>{    
-        if(err){
-            console.log("ERRROR Happened",err);
-        }
-        console.log("COUNT",count);
-      })
-      REDIS_CLIENT.on('pmessage', async(pattern, channel, message) => {
-        const { PROJECT_ID, DEPLOYMENT_ID, log } = JSON.parse(message)
-        const { query_id } = await ClickHouseclient.insert({
-            table: 'log_events',
-            values: [
-                { event_id: uuid_v4(), deployment_id: DEPLOYMENT_ID, log: log },
 
-            ],
-            format: 'JSONEachRow',
+        REDIS_CLIENT.psubscribe("log:*", (err, count) => {
+            if (err) {
+                console.log("ERRROR Happened", err);
+            }
+            console.log("COUNT", count);
         })
+        REDIS_CLIENT.on('pmessage', async (pattern, channel, message) => {
+            const { PROJECT_ID, DEPLOYMENT_ID, log } = JSON.parse(message)
+            const { query_id } = await ClickHouseclient.insert({
+                table: 'log_events',
+                values: [
+                    { event_id: uuid_v4(), deployment_id: DEPLOYMENT_ID, log: log },
 
-        console.log(`Received message: ${message} from channel ${channel} matching pattern ${pattern}`);
-      });
-      
+                ],
+                format: 'JSONEachRow',
+            })
+
+            console.log(`Received message: ${message} from channel ${channel} matching pattern ${pattern}`);
+        });
+
     } catch (error) {
 
         switch (error.name) {
